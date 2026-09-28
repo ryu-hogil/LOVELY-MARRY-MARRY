@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>양들의 혼례 - 예식 준비 공유 마트릭스</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wedding: {
+                            50: '#fdf8f6',
+                            100: '#f2e8e5',
+                            200: '#e8d5cf',
+                            500: '#a37160',
+                            600: '#8e5b4b',
+                            700: '#754739',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- React & ReactDOM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+        }
+        .serif-title {
+            font-family: 'Playfair Display', 'Noto Sans KR', serif;
+        }
+        .matrix-scroll::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+        .matrix-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .matrix-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .matrix-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Task Status Configuration
+        const STATUSES = {
+            NOT_STARTED: { id: '시작 전', label: '시작 전', color: 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200', dot: 'bg-slate-400', rowBg: 'hover:bg-slate-50/80' },
+            IN_PROGRESS: { id: '진행 중', label: '진행 중', color: 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200', dot: 'bg-blue-500', rowBg: 'bg-blue-50/20 hover:bg-blue-50/50' },
+            COMPLETED: { id: '완료', label: '완료', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200', dot: 'bg-emerald-500', rowBg: 'bg-emerald-50/20 hover:bg-emerald-50/50' },
+            URGENT: { id: '긴급', label: '긴급', color: 'bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200', dot: 'bg-rose-500', rowBg: 'bg-rose-50/30 hover:bg-rose-50/60' }
+        };
+
+        // Initial Assignees
+        const INITIAL_ASSIGNEES = [
+            { id: '공동', label: '공동', bg: 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200' },
+            { id: '신랑', label: '신랑', bg: 'bg-sky-100 text-sky-900 border-sky-200 hover:bg-sky-200' },
+            { id: '신부', label: '신부', bg: 'bg-rose-100 text-rose-900 border-rose-200 hover:bg-rose-200' },
+            { id: '시니', label: '시니', bg: 'bg-pink-100 text-pink-900 border-pink-200 hover:bg-pink-200' },
+            { id: '호기르', label: '호기르', bg: 'bg-teal-100 text-teal-900 border-teal-200 hover:bg-teal-200' }
+        ];
+
+        // Sample initial hierarchy tasks
+        const SAMPLE_TASKS = [
+            { id: '1', title: '식전', level: 1, assignee: '공동', dueDate: '2026-11-30', startMonth: '2026-05', endMonth: '2026-11', budget: 15000000, expense: '12500000', memo: '식전 전체 예산 및 일정 총괄', status: '진행 중' },
+            { id: '1-1', title: '사진', level: 2, assignee: '신부', dueDate: '2026-10-15', startMonth: '2026-06', endMonth: '2026-10', budget: 4500000, expense: '2000000 + 1800000', memo: '스튜디오 + 야외 스냅 총괄', status: '진행 중' },
+            { id: '1-1-1', title: '사진관', level: 3, assignee: '신부', dueDate: '2026-08-20', startMonth: '2026-06', endMonth: '2026-08', budget: 2500000, expense: '2200000', memo: '실내 스튜디오 계약 완료', status: '완료' },
+            { id: '1-1-1-1', title: '스튜디오 컨셉 가능 여부', level: 4, assignee: '신부', dueDate: '2026-07-10', startMonth: '2026-06', endMonth: '2026-07', budget: 0, expense: '0', memo: '인스타그램 샘플 확인 후 사전 미팅', status: '완료' },
+            { id: '1-1-2', title: '야외스냅', level: 3, assignee: '신랑', dueDate: '2026-09-25', startMonth: '2026-07', endMonth: '2026-09', budget: 1500000, expense: '1600000', memo: '제주도 야외 촬영 예약 건', status: '긴급' },
+            { id: '1-1-2-1', title: '업체선정', level: 4, assignee: '신랑', dueDate: '2026-07-30', startMonth: '2026-07', endMonth: '2026-07', budget: 0, expense: '0', memo: '작가 포트폴리오 비교 결정', status: '완료' },
+            { id: '1-1-2-2', title: '컨셉', level: 4, assignee: '공동', dueDate: '2026-08-15', startMonth: '2026-08', endMonth: '2026-08', budget: 100000, expense: '80000', memo: '빈티지 및 자연주의 콘셉트 설정', status: '완료' },
+            { id: '1-1-2-2-1', title: '참고 이미지 모으기 (5단계)', level: 5, assignee: '신부', dueDate: '2026-08-10', startMonth: '2026-08', endMonth: '2026-08', budget: 0, expense: '0', memo: '핀터레스트 보드 공유', status: '완료' },
+            { id: '1-1-2-2-1-1', title: '세부 소품 색상 확정 (6단계)', level: 6, assignee: '시니', dueDate: '2026-08-12', startMonth: '2026-08', endMonth: '2026-08', budget: 50000, expense: '45000', memo: '파스텔 톤 리본 구비', status: '완료' },
+            { id: '1-1-2-3', title: '장소협의', level: 4, assignee: '신랑', dueDate: '2026-08-30', startMonth: '2026-08', endMonth: '2026-08', budget: 0, expense: '0', memo: '동선 및 허가 장소 확인', status: '완료' },
+            { id: '1-1-2-4', title: '의상', level: 4, assignee: '신부', dueDate: '2026-09-05', startMonth: '2026-08', endMonth: '2026-09', budget: 500000, expense: '550000', memo: '캐주얼 드레스 & 슈트 대여', status: '진행 중' },
+            { id: '1-1-2-5', title: '메이크업', level: 4, assignee: '호기르', dueDate: '2026-09-15', startMonth: '2026-09', endMonth: '2026-09', budget: 300000, expense: '300000', memo: '현지 메이크업 샵 예약', status: '진행 중' },
+            { id: '1-1-3', title: '셀프웨딩스냅', level: 3, assignee: '공동', dueDate: '2026-10-10', startMonth: '2026-09', endMonth: '2026-10', budget: 500000, expense: '250000', memo: '소품 및 촬영 도구 구비', status: '시작 전' },
+            { id: '1-1-3-1', title: '촬영소품', level: 4, assignee: '신부', dueDate: '2026-09-20', startMonth: '2026-09', endMonth: '2026-09', budget: 150000, expense: '120000 + 30000', memo: '조화 부케, 가랜드 구매', status: '시작 전' },
+            { id: '1-1-3-2', title: '촬영도구', level: 4, assignee: '신랑', dueDate: '2026-09-25', startMonth: '2026-09', endMonth: '2026-09', budget: 200000, expense: '100000', memo: '삼각대 및 리모컨 점검', status: '시작 전' },
+            { id: '1-2', title: '웨딩밴드(반지) 맞추기', level: 2, assignee: '공동', dueDate: '2026-11-15', startMonth: '2026-08', endMonth: '2026-11', budget: 3500000, expense: '3200000', memo: '수령 및 인그레이빙 확인', status: '진행 중' },
+            { id: '2', title: '웨딩홀 투어 및 계약', level: 1, assignee: '공동', dueDate: '2026-12-20', startMonth: '2026-05', endMonth: '2026-12', budget: 12000000, expense: '10000000 + 2000000', memo: '보증인원 및 피연장 계약', status: '완료' }
+        ];
+
+        // Safe expression evaluator for simple math calculations
+        function safeEvaluateExpense(expr) {
+            if (!expr) return 0;
+            if (typeof expr === 'number') return expr;
+            try {
+                const clean = String(expr).replace(/[^0-9+\-*/().]/g, '');
+                if (!clean) return 0;
+                const evalFn = new Function(`return (${clean})`);
+                const result = evalFn();
+                return isNaN(result) || !isFinite(result) ? 0 : Math.max(0, result);
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        // Format numbers to Korean Won
+        function formatWon(num) {
+            const val = Math.round(Number(num) || 0);
+            return val.toLocaleString('ko-KR') + '원';
+        }
+
+        // Hierarchy Prefix Calculator (Level 1 to Level 6)
+        function getHierarchyPrefix(taskIndex, allTasks) {
+            const task = allTasks[taskIndex];
+            const level = task ? (task.level || 1) : 1;
+
+            let parentIndex = -1;
+            for (let j = taskIndex - 1; j >= 0; j--) {
+                if (allTasks[j].level < level) {
+                    parentIndex = j;
+                    break;
+                }
+            }
+
+            let siblingCount = 0;
+            for (let k = parentIndex + 1; k <= taskIndex; k++) {
+                if (allTasks[k].level === level) {
+                    siblingCount++;
+                }
+            }
+            siblingCount = Math.max(1, siblingCount);
+
+            const koreanChar = (num) => {
+                const chars = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하'];
+                return chars[(num - 1) % chars.length];
+            };
+
+            if (level === 1) return `${siblingCount}.`;
+            if (level === 2) return `${koreanChar(siblingCount)}.`;
+            if (level === 3) return `${siblingCount})`;
+            if (level === 4) return `${koreanChar(siblingCount)})`;
+            if (level === 5) return `(${siblingCount})`;
+            if (level === 6) return `(${koreanChar(siblingCount)})`;
+            return `•`;
+        }
+
+        function App() {
+            // LocalStorage persistence
+            const [tasks, setTasks] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('lambs_wedding_tasks');
+                    return saved ? JSON.parse(saved) : SAMPLE_TASKS;
+                } catch(e) {
+                    return SAMPLE_TASKS;
+                }
+            });
+
+            // Column Widths State (Resizable columns for 업무, 상한액, 지출액, 메모)
+            // Default memo is 320px, budget is expanded to 160px with resize support
+            const [colWidths, setColWidths] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('lambs_wedding_col_widths');
+                    return saved ? JSON.parse(saved) : { task: 400, budget: 160, expense: 180, memo: 320 };
+                } catch(e) {
+                    return { task: 400, budget: 160, expense: 180, memo: 320 };
+                }
+            });
+
+            const [assignees, setAssignees] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('lambs_wedding_assignees');
+                    return saved ? JSON.parse(saved) : INITIAL_ASSIGNEES;
+                } catch(e) {
+                    return INITIAL_ASSIGNEES;
+                }
+            });
+
+            // Save column widths to localStorage
+            useEffect(() => {
+                localStorage.setItem('lambs_wedding_col_widths', JSON.stringify(colWidths));
+            }, [colWidths]);
+
+            // Save to localStorage
+            useEffect(() => {
+                localStorage.setItem('lambs_wedding_tasks', JSON.stringify(tasks));
+            }, [tasks]);
+
+            useEffect(() => {
+                localStorage.setItem('lambs_wedding_assignees', JSON.stringify(assignees));
+            }, [assignees]);
+
+            // Drag handler for column resizing
+            const handleResizeMouseDown = (colKey, e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const startX = e.clientX;
+                const startWidth = colWidths[colKey] || 200;
+
+                const onMouseMove = (moveEvent) => {
+                    const deltaX = moveEvent.clientX - startX;
+                    const minWidth = colKey === 'task' ? 240 : 100;
+                    const newWidth = Math.max(minWidth, startWidth + deltaX);
+                    setColWidths(prev => ({ ...prev, [colKey]: newWidth }));
+                };
+
+                const onMouseUp = () => {
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                };
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            };
+
+            const handleResetColWidths = () => {
+                setColWidths({ task: 400, budget: 160, expense: 180, memo: 320 });
+            };
+
+            // Timeline month range & count
+            const [startYearMonth, setStartYearMonth] = useState('2026-05');
+            const [monthCount, setMonthCount] = useState(12);
+
+            // Filters & Search
+            const [filterStatus, setFilterStatus] = useState('ALL');
+            const [filterAssignee, setFilterAssignee] = useState('ALL');
+            const [searchQuery, setSearchQuery] = useState('');
+
+            // Popovers
+            const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
+            const [newAssigneeName, setNewAssigneeName] = useState('');
+            const [activeAssigneeDropdown, setActiveAssigneeDropdown] = useState(null);
+            const [activeStatusDropdown, setActiveStatusDropdown] = useState(null);
+
+            // Save to localStorage
+            useEffect(() => {
+                localStorage.setItem('lambs_wedding_tasks', JSON.stringify(tasks));
+            }, [tasks]);
+
+            useEffect(() => {
+                localStorage.setItem('lambs_wedding_assignees', JSON.stringify(assignees));
+            }, [assignees]);
+
+            // Re-render Lucide icons
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+
+            // Generate timeline month objects
+            const timelineMonths = useMemo(() => {
+                const months = [];
+                const [startYear, startMonth] = startYearMonth.split('-').map(Number);
+                let currentY = startYear || 2026;
+                let currentM = startMonth || 5;
+
+                for (let i = 0; i < monthCount; i++) {
+                    const formattedM = String(currentM).padStart(2, '0');
+                    const key = `${currentY}-${formattedM}`;
+                    months.push({
+                        key,
+                        year: currentY,
+                        month: currentM,
+                        label: `${currentM}월`,
+                        fullLabel: `${currentY}년 ${currentM}월`
+                    });
+
+                    currentM++;
+                    if (currentM > 12) {
+                        currentM = 1;
+                        currentY++;
+                    }
+                }
+                return months;
+            }, [startYearMonth, monthCount]);
+
+            // Current month string
+            const currentYearMonthKey = useMemo(() => {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                return `${y}-${m}`;
+            }, []);
+
+            // Overall Summary Calculations
+            const summaryData = useMemo(() => {
+                let totalBudget = 0;
+                let totalExpense = 0;
+                let urgentCount = 0;
+                let completedCount = 0;
+
+                tasks.forEach(t => {
+                    totalBudget += Number(t.budget || 0);
+                    totalExpense += safeEvaluateExpense(t.expense);
+                    if (t.status === '긴급') urgentCount++;
+                    if (t.status === '완료') completedCount++;
+                });
+
+                const completionRate = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+                const remaining = totalBudget - totalExpense;
+
+                return {
+                    totalBudget,
+                    totalExpense,
+                    remaining,
+                    urgentCount,
+                    completedCount,
+                    totalTasks: tasks.length,
+                    completionRate
+                };
+            }, [tasks]);
+
+            // Handlers
+            const handleAddTask = (afterId = null, defaultLevel = 1) => {
+                const newTask = {
+                    id: Date.now().toString(),
+                    title: '새 업무 항목',
+                    level: defaultLevel,
+                    assignee: '공동',
+                    dueDate: '',
+                    startMonth: timelineMonths[0]?.key || '2026-05',
+                    endMonth: timelineMonths[3]?.key || '2026-08',
+                    budget: 0,
+                    expense: '0',
+                    memo: '',
+                    status: '시작 전'
+                };
+
+                if (!afterId) {
+                    setTasks([...tasks, newTask]);
+                    return;
+                }
+
+                const index = tasks.findIndex(t => t.id === afterId);
+                const updated = [...tasks];
+                updated.splice(index + 1, 0, newTask);
+                setTasks(updated);
+            };
+
+            const handleUpdateTask = (id, field, value) => {
+                setTasks(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+            };
+
+            const handleDeleteTask = (id) => {
+                setTasks(prev => prev.filter(t => t.id !== id));
+            };
+
+            const handleIndent = (id, direction) => {
+                setTasks(prev => prev.map(t => {
+                    if (t.id === id) {
+                        const newLevel = direction === 'increase' ? Math.min(6, t.level + 1) : Math.max(1, t.level - 1);
+                        return { ...t, level: newLevel };
+                    }
+                    return t;
+                }));
+            };
+
+            const handleDeleteAssignee = (assigneeId) => {
+                if (assignees.length <= 1) return;
+                setAssignees(prev => prev.filter(a => a.id !== assigneeId));
+                setTasks(prev => prev.map(t => t.assignee === assigneeId ? { ...t, assignee: '공동' } : t));
+            };
+
+            const handleAddAssignee = () => {
+                if (!newAssigneeName.trim()) return;
+                const colorOptions = [
+                    'bg-purple-100 text-purple-900 border-purple-200 hover:bg-purple-200',
+                    'bg-indigo-100 text-indigo-900 border-indigo-200 hover:bg-indigo-200',
+                    'bg-emerald-100 text-emerald-900 border-emerald-200 hover:bg-emerald-200',
+                    'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200',
+                    'bg-rose-100 text-rose-900 border-rose-200 hover:bg-rose-200'
+                ];
+                const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                const newAssignee = {
+                    id: newAssigneeName.trim(),
+                    label: newAssigneeName.trim(),
+                    bg: randomColor
+                };
+                setAssignees([...assignees, newAssignee]);
+                setNewAssigneeName('');
+                setAssigneeModalOpen(false);
+            };
+
+            const handleMonthClick = (task, monthKey) => {
+                let start = task.startMonth;
+                let end = task.endMonth;
+
+                if (!start || !end) {
+                    start = monthKey;
+                    end = monthKey;
+                } else if (monthKey < start) {
+                    start = monthKey;
+                } else if (monthKey > end) {
+                    end = monthKey;
+                } else {
+                    start = monthKey;
+                    end = monthKey;
+                }
+
+                handleUpdateTask(task.id, 'startMonth', start);
+                handleUpdateTask(task.id, 'endMonth', end);
+            };
+
+            const handleExportData = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tasks, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `양들의_혼례_예식준비_${new Date().toISOString().slice(0, 10)}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            };
+
+            const handleImportData = (e) => {
+                const fileReader = new FileReader();
+                if (e.target.files[0]) {
+                    fileReader.readAsText(e.target.files[0], "UTF-8");
+                    fileReader.onload = (event) => {
+                        try {
+                            const parsed = JSON.parse(event.target.result);
+                            if (Array.isArray(parsed)) {
+                                setTasks(parsed);
+                            }
+                        } catch (err) {
+                            // ignore err
+                        }
+                    };
+                }
+            };
+
+            const handleResetData = () => {
+                setTasks(SAMPLE_TASKS);
+                setAssignees(INITIAL_ASSIGNEES);
+            };
+
+            // Filtered Tasks list
+            const filteredTasks = useMemo(() => {
+                return tasks.filter(t => {
+                    const matchesStatus = filterStatus === 'ALL' || t.status === filterStatus;
+                    const matchesAssignee = filterAssignee === 'ALL' || t.assignee === filterAssignee;
+                    const matchesSearch = !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.memo && t.memo.toLowerCase().includes(searchQuery.toLowerCase()));
+                    return matchesStatus && matchesAssignee && matchesSearch;
+                });
+            }, [tasks, filterStatus, filterAssignee, searchQuery]);
+
+            return (
+                <div className="min-h-screen flex flex-col pb-16 bg-slate-50 text-slate-800">
+                    {/* Header Banner */}
+                    <header className="bg-gradient-to-r from-rose-900 via-wedding-700 to-amber-900 text-white shadow-xl">
+                        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 text-2xl shadow-inner">
+                                        🐑
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight serif-title flex items-center gap-2">
+                                            양들의 혼례
+                                            <span className="text-xs bg-rose-500/80 text-white px-2.5 py-0.5 rounded-full font-sans font-medium uppercase tracking-wider">
+                                                Matrix Planner
+                                            </span>
+                                        </h1>
+                                        <p className="text-xs sm:text-sm text-rose-100/80 font-light mt-0.5">
+                                            예식 준비를 위한 통합 일정 및 예산 공유 시스템
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Header Top Actions */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        onClick={() => handleAddTask(null, 1)}
+                                        className="bg-white text-wedding-700 hover:bg-rose-50 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+                                    >
+                                        <i data-lucide="plus-circle" className="w-4 h-4"></i>
+                                        최상위 업무 추가
+                                    </button>
+                                    <button
+                                        onClick={handleExportData}
+                                        className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-medium backdrop-blur-sm border border-white/20 transition-all flex items-center gap-1.5"
+                                        title="JSON 파일로 백업 다운로드"
+                                    >
+                                        <i data-lucide="download" className="w-4 h-4"></i>
+                                        내보내기
+                                    </button>
+                                    <label className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-medium backdrop-blur-sm border border-white/20 cursor-pointer transition-all flex items-center gap-1.5">
+                                        <i data-lucide="upload" className="w-4 h-4"></i>
+                                        불러오기
+                                        <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+                                    </label>
+                                    <button
+                                        onClick={handleResetData}
+                                        className="bg-white/10 hover:bg-rose-500/30 text-rose-200 px-2.5 py-2 rounded-xl text-xs font-medium backdrop-blur-sm border border-white/10 transition-all"
+                                        title="초기 데이터로 복원"
+                                    >
+                                        <i data-lucide="rotate-ccw" className="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6">
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15">
+                                    <span className="text-xs text-rose-100/70 block mb-1">총 상한 예산</span>
+                                    <div className="text-lg sm:text-xl font-bold text-white tracking-wide">
+                                        {formatWon(summaryData.totalBudget)}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15">
+                                    <span className="text-xs text-rose-100/70 block mb-1">총 지출액 (실측)</span>
+                                    <div className="text-lg sm:text-xl font-bold text-amber-200 tracking-wide">
+                                        {formatWon(summaryData.totalExpense)}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15">
+                                    <span className="text-xs text-rose-100/70 block mb-1">예산 잔액 (차액)</span>
+                                    <div className={`text-lg sm:text-xl font-bold tracking-wide ${summaryData.remaining >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                        {summaryData.remaining >= 0 ? '+' : ''}{formatWon(summaryData.remaining)}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-xs text-rose-100/70">전체 진행률</span>
+                                        {summaryData.urgentCount > 0 && (
+                                            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold animate-pulse">
+                                                긴급 {summaryData.urgentCount}건
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-lg sm:text-xl font-bold text-white">
+                                        {summaryData.completionRate}%
+                                        <span className="text-xs font-normal text-rose-200 ml-1">
+                                            ({summaryData.completedCount}/{summaryData.totalTasks})
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-black/20 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                                        <div 
+                                            className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                                            style={{ width: `${summaryData.completionRate}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {}
+                    {/* Main Content Area */}
+                    <main className="max-w-[1680px] mx-auto px-3 sm:px-6 w-full mt-6 flex-grow">
+                        {/* Control Toolbar */}
+                        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-4 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/* Search input */}
+                                <div className="relative min-w-[200px]">
+                                    <i data-lucide="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    <input
+                                        type="text"
+                                        placeholder="업무명/메모 검색..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-wedding-500/50"
+                                    />
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
+                                    <span className="text-slate-400 px-2 font-medium">상태:</span>
+                                    <button
+                                        onClick={() => setFilterStatus('ALL')}
+                                        className={`px-2.5 py-1 rounded-lg transition-all ${filterStatus === 'ALL' ? 'bg-white font-bold text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        전체
+                                    </button>
+                                    {Object.values(STATUSES).map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setFilterStatus(s.id)}
+                                            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${filterStatus === s.id ? 'bg-white font-bold text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${s.dot}`}></span>
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Assignee Filter */}
+                                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
+                                    <span className="text-slate-400 px-2 font-medium">담당자:</span>
+                                    <select
+                                        value={filterAssignee}
+                                        onChange={(e) => setFilterAssignee(e.target.value)}
+                                        className="bg-transparent font-medium text-slate-700 outline-none pr-2 cursor-pointer"
+                                    >
+                                        <option value="ALL">전체 보기</option>
+                                        {assignees.map(a => (
+                                            <option key={a.id} value={a.id}>{a.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Timeline Control & Month Gauge Expansion Buttons */}
+                            <div className="flex items-center gap-3 text-xs text-slate-500">
+                                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                                    <span>시작월:</span>
+                                    <input
+                                        type="month"
+                                        value={startYearMonth}
+                                        onChange={(e) => setStartYearMonth(e.target.value)}
+                                        className="bg-transparent font-medium text-slate-700 outline-none cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 스케줄 게이지 달(개월) 늘이기 / 줄이기 컨트롤 */}
+                                <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                                    <span>표시 개월:</span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMonthCount(prev => Math.max(1, prev - 1))}
+                                            className="w-5 h-5 flex items-center justify-center bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 font-bold active:scale-95 transition-transform"
+                                            title="게이지 1개월 줄이기"
+                                        >-</button>
+                                        <span className="font-bold text-slate-800 min-w-[28px] text-center">{monthCount}개월</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMonthCount(prev => Math.min(60, prev + 1))}
+                                            className="w-5 h-5 flex items-center justify-center bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 font-bold active:scale-95 transition-transform"
+                                            title="게이지 1개월 늘이기"
+                                        >+</button>
+                                    </div>
+                                </div>
+
+                                {/* Column Width Reset & Drag Guide Button */}
+                                <button
+                                    onClick={handleResetColWidths}
+                                    className="hidden sm:flex items-center gap-1 bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 transition-colors"
+                                    title="열 너비 초기화 (업무: 400px, 상한액: 160px, 지출액: 180px, 메모: 320px)"
+                                >
+                                    <i data-lucide="move-horizontal" className="w-3.5 h-3.5"></i>
+                                    열 너비 리셋
+                                </button>
+
+                                <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                                    <span className="w-2.5 h-2.5 bg-rose-400/30 border border-rose-500 inline-block rounded-sm"></span>
+                                    <span>음영 열 = 현재 달({currentYearMonthKey})</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Matrix Table */}
+                        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                            <div className="overflow-x-auto matrix-scroll">
+                                <table className="w-full text-left border-collapse min-w-[1380px]">
+                                    <thead>
+                                        <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+                                            {/* Column 1: 업무 (Resizable Width) */}
+                                            <th 
+                                                style={{ width: `${colWidths.task}px`, minWidth: `${colWidths.task}px`, maxWidth: `${colWidths.task}px` }}
+                                                className="py-3.5 px-4 bg-slate-100 border-r border-slate-200 sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] relative group/resizer select-none"
+                                            >
+                                                <div className="flex items-center justify-between pr-2">
+                                                    <span>1. 업무</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal">위계 (드래그 조절)</span>
+                                                </div>
+                                                {/* Drag Resize Handle */}
+                                                <div 
+                                                    onMouseDown={(e) => handleResizeMouseDown('task', e)}
+                                                    className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-wedding-500/50 active:bg-wedding-600 transition-colors z-40"
+                                                    title="드래그하여 업무 열 너비 조절"
+                                                />
+                                            </th>
+
+                                            {/* Column 2: 담당자 */}
+                                            <th className="py-3.5 px-2 w-[85px] min-w-[85px] border-r border-slate-200 text-center">
+                                                2. 담당자
+                                            </th>
+
+                                            {/* Column 3: 완료 예정일 */}
+                                            <th className="py-3.5 px-3 w-[130px] border-r border-slate-200 text-center">
+                                                3. 완료 예정일
+                                            </th>
+
+                                            {/* Column 4: 스케줄 게이지 */}
+                                            <th className="py-2 px-2 border-r border-slate-200 text-center bg-slate-100" style={{ minWidth: `${Math.max(280, monthCount * 42)}px` }}>
+                                                <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1 px-1">
+                                                    <span>4. 스케줄 게이지 (월별 일정 범위)</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal">총 {monthCount}개월</span>
+                                                </div>
+                                                <div 
+                                                    className="grid gap-px bg-slate-200 rounded overflow-hidden"
+                                                    style={{ gridTemplateColumns: `repeat(${monthCount}, minmax(40px, 1fr))` }}
+                                                >
+                                                    {timelineMonths.map(m => {
+                                                        const isCurrent = m.key === currentYearMonthKey;
+                                                        return (
+                                                            <div 
+                                                                key={m.key} 
+                                                                className={`py-1 text-[11px] font-bold text-center transition-colors truncate px-0.5 ${
+                                                                    isCurrent 
+                                                                        ? 'bg-rose-500 text-white shadow-inner font-extrabold' 
+                                                                        : 'bg-slate-100 text-slate-700'
+                                                                }`}
+                                                            >
+                                                                {m.label}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </th>
+
+                                            {/* Column 5: 상한액 (Resizable Width) */}
+                                            <th 
+                                                style={{ width: `${colWidths.budget || 160}px`, minWidth: `${colWidths.budget || 160}px` }}
+                                                className="py-3.5 px-3 border-r border-slate-200 text-right relative group/resizer select-none"
+                                            >
+                                                <span>5. 상한액</span>
+                                                {/* Drag Resize Handle */}
+                                                <div 
+                                                    onMouseDown={(e) => handleResizeMouseDown('budget', e)}
+                                                    className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-wedding-500/50 active:bg-wedding-600 transition-colors z-40"
+                                                    title="드래그하여 상한액 열 너비 조절"
+                                                />
+                                            </th>
+
+                                            {/* Column 6: 지출액 (Resizable Width) */}
+                                            <th 
+                                                style={{ width: `${colWidths.expense}px`, minWidth: `${colWidths.expense}px` }}
+                                                className="py-3.5 px-3 border-r border-slate-200 text-right relative group/resizer select-none"
+                                            >
+                                                <span>6. 지출액 (연산)</span>
+                                                {/* Drag Resize Handle */}
+                                                <div 
+                                                    onMouseDown={(e) => handleResizeMouseDown('expense', e)}
+                                                    className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-wedding-500/50 active:bg-wedding-600 transition-colors z-40"
+                                                    title="드래그하여 지출액 열 너비 조절"
+                                                />
+                                            </th>
+
+                                            {/* Column 7: 메모 (Expanded Default to 320px & Resizable Width) */}
+                                            <th 
+                                                style={{ width: `${colWidths.memo}px`, minWidth: `${colWidths.memo}px` }}
+                                                className="py-3.5 px-3 border-r border-slate-200 relative group/resizer select-none"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span>7. 메모</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal">드래그 조절</span>
+                                                </div>
+                                                {/* Drag Resize Handle */}
+                                                <div 
+                                                    onMouseDown={(e) => handleResizeMouseDown('memo', e)}
+                                                    className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-wedding-500/50 active:bg-wedding-600 transition-colors z-40"
+                                                    title="드래그하여 메모 열 너비 조절"
+                                                />
+                                            </th>
+
+                                            {/* Column 8: 진행 상태 */}
+                                            <th className="py-3.5 px-3 w-[145px] min-w-[145px] text-center">
+                                                진행 상태
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    {/* Table Body */}
+                                    <tbody className="divide-y divide-slate-200 text-xs">
+                                        {filteredTasks.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="py-12 text-center text-slate-400 bg-slate-50/50">
+                                                    <i data-lucide="file-x" className="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+                                                    조건에 해당하는 업무 항목이 없습니다.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredTasks.map((task) => {
+                                                const originalIndex = tasks.findIndex(t => t.id === task.id);
+                                                const statusInfo = STATUSES[
+                                                    Object.keys(STATUSES).find(k => STATUSES[k].id === task.status) || 'NOT_STARTED'
+                                                ];
+
+                                                const prefix = getHierarchyPrefix(originalIndex, tasks);
+                                                const evaluatedExpense = safeEvaluateExpense(task.expense);
+                                                const variance = (task.budget || 0) - evaluatedExpense;
+                                                const currentAssigneeObj = assignees.find(a => a.id === task.assignee) || { label: task.assignee || '공동', bg: 'bg-amber-100 text-amber-900 border-amber-200' };
+
+                                                return (
+                                                    <tr 
+                                                        key={task.id}
+                                                        className={`transition-colors group ${statusInfo.rowBg}`}
+                                                    >
+                                                        {/* COLUMN 1: 업무 (Title & Dynamic Resizable Width) */}
+                                                        <td 
+                                                            style={{ width: `${colWidths.task}px`, minWidth: `${colWidths.task}px`, maxWidth: `${colWidths.task}px` }}
+                                                            className="py-2 px-3 border-r border-slate-200 sticky left-0 z-10 bg-white/95 backdrop-blur-sm shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]"
+                                                        >
+                                                            <div className="flex items-center gap-1.5" style={{ paddingLeft: `${(task.level - 1) * 12}px` }}>
+                                                                {/* Hierarchy Controls */}
+                                                                <div className="flex items-center opacity-40 group-hover:opacity-100 transition-opacity shrink-0">
+                                                                    <button
+                                                                        onClick={() => handleIndent(task.id, 'decrease')}
+                                                                        disabled={task.level <= 1}
+                                                                        className="p-0.5 hover:bg-slate-200 rounded text-slate-500 disabled:opacity-20"
+                                                                        title="내어쓰기 (위계 상승)"
+                                                                    >
+                                                                        <i data-lucide="chevron-left" className="w-3.5 h-3.5"></i>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleIndent(task.id, 'increase')}
+                                                                        disabled={task.level >= 6}
+                                                                        className="p-0.5 hover:bg-slate-200 rounded text-slate-500 disabled:opacity-20"
+                                                                        title="들여쓰기 (위계 하강 - 최대 6단계)"
+                                                                    >
+                                                                        <i data-lucide="chevron-right" className="w-3.5 h-3.5"></i>
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Numbering Prefix Indicator */}
+                                                                <span className={`font-mono font-bold shrink-0 text-xs ${task.level === 1 ? 'text-wedding-700 font-extrabold text-sm' : task.level === 2 ? 'text-slate-800' : 'text-slate-500'}`}>
+                                                                    {prefix}
+                                                                </span>
+
+                                                                {/* Title Input */}
+                                                                <input
+                                                                    type="text"
+                                                                    value={task.title}
+                                                                    onChange={(e) => handleUpdateTask(task.id, 'title', e.target.value)}
+                                                                    className={`w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-wedding-500 focus:bg-white focus:outline-none px-1.5 py-1 rounded transition-all truncate font-medium ${
+                                                                        task.level === 1 ? 'font-bold text-slate-900 text-sm' : 
+                                                                        task.level === 2 ? 'font-semibold text-slate-800' : 'text-slate-700'
+                                                                    }`}
+                                                                />
+
+                                                                {/* Quick Add Sub-task Button */}
+                                                                <button
+                                                                    onClick={() => handleAddTask(task.id, Math.min(6, task.level + 1))}
+                                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-100 text-rose-700 rounded transition-opacity shrink-0"
+                                                                    title="하위 업무 추가"
+                                                                >
+                                                                    <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* 수정사항2: COLUMN 2 담당자 (칸 크기 감소 적용) */}
+                                                        <td className="py-2 px-1.5 border-r border-slate-200 text-center relative w-[85px] min-w-[85px]">
+                                                            <div className="relative inline-block text-left w-full">
+                                                                <button
+                                                                    onClick={() => setActiveAssigneeDropdown(activeAssigneeDropdown === task.id ? null : task.id)}
+                                                                    className={`w-full px-1.5 py-1 rounded-full text-[11px] font-bold border flex items-center justify-between gap-0.5 shadow-2xs transition-transform active:scale-95 ${currentAssigneeObj.bg}`}
+                                                                >
+                                                                    <span className="truncate mx-auto">{task.assignee || '공동'}</span>
+                                                                    <i data-lucide="chevron-down" className="w-3 h-3 opacity-60 shrink-0"></i>
+                                                                </button>
+
+                                                                {/* Assignee Popover */}
+                                                                {activeAssigneeDropdown === task.id && (
+                                                                    <div className="absolute left-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-1.5 space-y-1">
+                                                                        {assignees.map(a => (
+                                                                            <div key={a.id} className="flex items-center justify-between group/assignee rounded-lg pr-1 hover:bg-slate-50">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        handleUpdateTask(task.id, 'assignee', a.id);
+                                                                                        setActiveAssigneeDropdown(null);
+                                                                                    }}
+                                                                                    className={`flex-1 text-left px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors border ${a.bg}`}
+                                                                                >
+                                                                                    {a.label}
+                                                                                    {task.assignee === a.id && <i data-lucide="check" className="w-3 h-3"></i>}
+                                                                                </button>
+                                                                                {assignees.length > 1 && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleDeleteAssignee(a.id);
+                                                                                        }}
+                                                                                        className="opacity-0 group-hover/assignee:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-rose-50 ml-1 transition-all"
+                                                                                        title="담당자 항목 삭제"
+                                                                                    >
+                                                                                        <i data-lucide="trash-2" className="w-3 h-3"></i>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                        <div className="border-t border-slate-100 pt-1 mt-1">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setActiveAssigneeDropdown(null);
+                                                                                    setAssigneeModalOpen(true);
+                                                                                }}
+                                                                                className="w-full text-center px-2 py-1 text-[11px] text-slate-500 hover:text-wedding-700 font-medium hover:bg-slate-50 rounded flex items-center justify-center gap-1"
+                                                                            >
+                                                                                <i data-lucide="plus" className="w-3 h-3"></i>
+                                                                                담당자 추가
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+
+                                                        {/* COLUMN 3: 완료 예정일 */}
+                                                        <td className="py-2 px-2 border-r border-slate-200 text-center">
+                                                            <div className="flex flex-col items-center">
+                                                                <input
+                                                                    type="date"
+                                                                    value={task.dueDate || ''}
+                                                                    onChange={(e) => handleUpdateTask(task.id, 'dueDate', e.target.value)}
+                                                                    className="bg-transparent text-xs font-medium text-slate-700 outline-none text-center cursor-pointer hover:bg-slate-100 rounded px-1 py-0.5"
+                                                                />
+                                                                {task.dueDate && (
+                                                                    <span className="text-[10px] text-slate-400 font-mono">
+                                                                        {(() => {
+                                                                            const diff = Math.ceil((new Date(task.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                                                                            if (isNaN(diff)) return '';
+                                                                            if (diff === 0) return 'D-Day';
+                                                                            return diff > 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+                                                                        })()}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+
+                                                        {/* 수정사항1: COLUMN 4 스케줄 게이지 (동적 달 수 대응 및 가로 스크롤 가능) */}
+                                                        <td className="py-2 px-2 border-r border-slate-200" style={{ minWidth: `${Math.max(280, monthCount * 42)}px` }}>
+                                                            <div 
+                                                                className="grid gap-px bg-slate-200/80 rounded p-0.5 relative select-none"
+                                                                style={{ gridTemplateColumns: `repeat(${monthCount}, minmax(40px, 1fr))` }}
+                                                            >
+                                                                {timelineMonths.map(m => {
+                                                                    const isCurrentMonth = m.key === currentYearMonthKey;
+                                                                    const isInRange = task.startMonth && task.endMonth && (m.key >= task.startMonth && m.key <= task.endMonth);
+                                                                    const isStart = m.key === task.startMonth;
+                                                                    const isEnd = m.key === task.endMonth;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={m.key}
+                                                                            onClick={() => handleMonthClick(task, m.key)}
+                                                                            title={`${m.fullLabel} (클릭하여 범위를 변경하세요)`}
+                                                                            className={`h-7 rounded-sm cursor-pointer transition-all flex items-center justify-center relative ${
+                                                                                isCurrentMonth ? 'bg-rose-100/60' : 'bg-white'
+                                                                            }`}
+                                                                        >
+                                                                            {/* Current Month Highlight Dot */}
+                                                                            {isCurrentMonth && (
+                                                                                <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500"></div>
+                                                                            )}
+
+                                                                            {/* Active Gauge Bar */}
+                                                                            {isInRange && (
+                                                                                <div className={`w-full h-5 flex items-center justify-center font-bold text-[10px] text-white shadow-2xs transition-all ${
+                                                                                    task.status === '완료' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                                                                                    task.status === '긴급' ? 'bg-rose-500 hover:bg-rose-600' :
+                                                                                    task.status === '진행 중' ? 'bg-blue-500 hover:bg-blue-600' :
+                                                                                    'bg-slate-400 hover:bg-slate-500'
+                                                                                } ${isStart ? 'rounded-l-md' : ''} ${isEnd ? 'rounded-r-md' : ''}`}>
+                                                                                    {isStart && <span className="px-0.5 truncate">{m.month}월</span>}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </td>
+
+                                                        {/* COLUMN 5: 상한액 (Dynamic Resizable Width) */}
+                                                        <td 
+                                                            style={{ width: `${colWidths.budget || 160}px`, minWidth: `${colWidths.budget || 160}px` }}
+                                                            className="py-2 px-2 border-r border-slate-200 text-right"
+                                                        >
+                                                            <input
+                                                                type="number"
+                                                                value={task.budget || 0}
+                                                                onChange={(e) => handleUpdateTask(task.id, 'budget', Number(e.target.value))}
+                                                                className="w-full bg-transparent text-right font-mono text-xs text-slate-800 font-semibold outline-none hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-wedding-500 rounded px-1.5 py-1"
+                                                                step="10000"
+                                                            />
+                                                            <span className="text-[10px] text-slate-400 block font-mono">
+                                                                {formatWon(task.budget)}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* COLUMN 6: 지출액 (Dynamic Resizable Width) */}
+                                                        <td 
+                                                            style={{ width: `${colWidths.expense}px`, minWidth: `${colWidths.expense}px` }}
+                                                            className="py-2 px-2 border-r border-slate-200 text-right"
+                                                        >
+                                                            <input
+                                                                type="text"
+                                                                value={task.expense || ''}
+                                                                placeholder="예: 100000+50000"
+                                                                onChange={(e) => handleUpdateTask(task.id, 'expense', e.target.value)}
+                                                                className="w-full bg-transparent text-right font-mono text-xs text-slate-800 font-semibold outline-none hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-wedding-500 rounded px-1.5 py-1"
+                                                            />
+                                                            <div className="flex items-center justify-end gap-1 mt-0.5">
+                                                                <span className="text-[10px] text-slate-500 font-mono">
+                                                                    {formatWon(evaluatedExpense)}
+                                                                </span>
+                                                                {task.budget > 0 && (
+                                                                    <span className={`text-[9px] font-mono px-1 rounded ${
+                                                                        variance < 0 ? 'bg-rose-100 text-rose-700 font-bold' : 'text-emerald-600'
+                                                                    }`}>
+                                                                        {variance < 0 ? `초과 ${formatWon(Math.abs(variance))}` : `절감`}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+
+                                                        {/* COLUMN 7: 메모 (Dynamic Resizable Width & Default 320px) */}
+                                                        <td 
+                                                            style={{ width: `${colWidths.memo}px`, minWidth: `${colWidths.memo}px` }}
+                                                            className="py-2 px-2 border-r border-slate-200"
+                                                        >
+                                                            <input
+                                                                type="text"
+                                                                value={task.memo || ''}
+                                                                placeholder="긴 메모나 전달사항도 넉넉하게 작성하세요..."
+                                                                onChange={(e) => handleUpdateTask(task.id, 'memo', e.target.value)}
+                                                                className="w-full bg-transparent text-xs text-slate-600 outline-none hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-wedding-500 rounded px-1.5 py-1"
+                                                            />
+                                                        </td>
+
+                                                        {/* COLUMN 8: 진행 상태 */}
+                                                        <td className="py-2 px-2 text-center relative w-[145px] min-w-[145px]">
+                                                            <div className="flex items-center justify-center gap-1.5 w-full">
+                                                                <div className="relative inline-block text-left flex-1 min-w-[90px]">
+                                                                    <button
+                                                                        onClick={() => setActiveStatusDropdown(activeStatusDropdown === task.id ? null : task.id)}
+                                                                        className={`w-full px-2 py-1 rounded-full text-[11px] font-bold border flex items-center justify-between gap-1 shadow-2xs transition-transform active:scale-95 ${statusInfo.color}`}
+                                                                    >
+                                                                        <span className="flex items-center gap-1.5 mx-auto whitespace-nowrap">
+                                                                            <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`}></span>
+                                                                            {task.status}
+                                                                        </span>
+                                                                        <i data-lucide="chevron-down" className="w-3 h-3 opacity-60 shrink-0"></i>
+                                                                    </button>
+
+                                                                    {/* Status Popover */}
+                                                                    {activeStatusDropdown === task.id && (
+                                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-1.5 space-y-1">
+                                                                            {Object.values(STATUSES).map(s => (
+                                                                                <button
+                                                                                    key={s.id}
+                                                                                    onClick={() => {
+                                                                                        handleUpdateTask(task.id, 'status', s.id);
+                                                                                        setActiveStatusDropdown(null);
+                                                                                    }}
+                                                                                    className={`w-full text-left px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors border ${s.color}`}
+                                                                                >
+                                                                                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                                                                                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`}></span>
+                                                                                        {s.label}
+                                                                                    </span>
+                                                                                    {task.status === s.id && <i data-lucide="check" className="w-3 h-3"></i>}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Reliable Direct Row Delete Button (X) */}
+                                                                <button
+                                                                    onClick={() => handleDeleteTask(task.id)}
+                                                                    className="p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded-lg transition-colors shrink-0"
+                                                                    title="행 삭제하기"
+                                                                >
+                                                                    <i data-lucide="x" className="w-4 h-4"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Matrix Footer Bar */}
+                            <div className="bg-slate-50 p-3 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => handleAddTask(null, 1)}
+                                        className="text-wedding-700 hover:text-wedding-800 font-bold flex items-center gap-1 bg-white border border-wedding-200 px-3 py-1.5 rounded-lg shadow-2xs hover:bg-rose-50/50 transition-all"
+                                    >
+                                        <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                                        새 업무 추가
+                                    </button>
+                                    <span>총 {filteredTasks.length}개 항목 표시 중</span>
+                                </div>
+                                <div className="flex items-center gap-4 font-mono text-[11px]">
+                                    <span>상한액 합계: <strong className="text-slate-800">{formatWon(summaryData.totalBudget)}</strong></span>
+                                    <span>지출액 합계: <strong className="text-amber-800">{formatWon(summaryData.totalExpense)}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {}
+                    {/* Custom Assignee Addition Modal */}
+                    {assigneeModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
+                                <h3 className="text-base font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                    <i data-lucide="user-plus" className="w-5 h-5 text-wedding-700"></i>
+                                    새 담당자 추가
+                                </h3>
+                                <p className="text-xs text-slate-500 mb-4">
+                                    업무를 담당할 신규 항목명을 입력해주세요 (예: 신랑 모친, 플래너, 시부모님 등).
+                                </p>
+                                <input
+                                    type="text"
+                                    placeholder="담당자 이름..."
+                                    value={newAssigneeName}
+                                    onChange={(e) => setNewAssigneeName(e.target.value)}
+                                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-wedding-500/50 mb-4"
+                                    autoFocus
+                                />
+                                <div className="flex justify-end gap-2 text-xs">
+                                    <button
+                                        onClick={() => setAssigneeModalOpen(false)}
+                                        className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl font-medium"
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        onClick={handleAddAssignee}
+                                        className="px-4 py-2 bg-wedding-700 hover:bg-wedding-800 text-white font-bold rounded-xl shadow-md"
+                                    >
+                                        추가하기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
